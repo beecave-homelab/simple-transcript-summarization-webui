@@ -19,7 +19,12 @@ def create_unique_filename(base_name, directory, extension):
 # Function to create the summarization interface within a tab
 def create_summarization_tab(model_name, model_description):
     # Load the specified model for summarization
-    summarizer = pipeline("summarization", model=model_name, device=0 if device == "mps" else -1)
+    summarizer = pipeline(
+        "summarization", 
+        model=model_name, 
+        device=0 if device == "mps" else -1,
+        use_fast=False  # Use the slow tokenizer for better accuracy with complex texts
+    )
 
     # Ensure the summary folder exists
     if not os.path.exists("summary"):
@@ -72,7 +77,21 @@ def create_summarization_tab(model_name, model_description):
         summaries = []
         for i, chunk in enumerate(chunks, start=1):
             print(f"Processing chunk {i} of {len(chunks)}...")  # Debug: Print the current chunk being processed
-            summary = summarizer(chunk, max_length=512, min_length=150, do_sample=False)[0]['summary_text']
+
+            # Calculate dynamic max_length as 70% of the chunk length
+            chunk_length = len(chunk.split())
+            dynamic_max_length = int(chunk_length * 0.7)  # You can adjust the multiplier (0.7) as needed
+
+            summary = summarizer(
+                chunk,
+                max_length=dynamic_max_length,  # Use dynamically calculated max_length
+                min_length=100,  # Keep a reasonable min_length to ensure some detail
+                num_beams=5,      # Using beam search for better quality summaries
+                length_penalty=1.2,  # Favoring slightly longer summaries
+                do_sample=True,   # Enable sampling for variety in summary generation
+                top_k=50,         # Sampling top_k most probable tokens
+                top_p=0.95        # Nucleus sampling for more diverse summaries
+            )[0]['summary_text']
             summaries.append(summary)
 
         final_summary = " ".join(summaries)
