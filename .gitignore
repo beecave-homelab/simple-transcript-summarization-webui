@@ -1,0 +1,9 @@
+# Ignore everything by default
+*
+
+# Except for these specific files
+!.gitignore
+!README.md
+!LICENSE
+!requirements.txt
+!app.py
