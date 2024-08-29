@@ -2,9 +2,19 @@ import os
 import gradio as gr
 from transformers import pipeline
 import torch
+import re
 
 # Determine if MPS is available
 device = "mps" if torch.backends.mps.is_available() else "cpu"
+
+# Function to create a unique filename
+def create_unique_filename(base_name, directory, extension):
+    counter = 1
+    unique_name = f"{base_name}{extension}"
+    while os.path.exists(os.path.join(directory, unique_name)):
+        unique_name = f"{base_name}_{counter}{extension}"
+        counter += 1
+    return unique_name
 
 # Function to create the summarization interface within a tab
 def create_summarization_tab(model_name, model_description):
@@ -39,12 +49,18 @@ def create_summarization_tab(model_name, model_description):
     def summarize(input_data):
         text_input = input_data.get("text", "")
         files = input_data.get("files", [])
+        summary_filename = ""
 
         if files:
+            # Use the uploaded file's name
             file_path = files[0]
             with open(file_path, 'r', encoding='utf-8') as f:
                 file_content = f.read()
             text_input = file_content if file_content else text_input
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            summary_filename = f"{base_name}_{model_description}"
+        else:
+            base_name = None
 
         if not text_input:
             return {"text": "Please provide some text or upload a file."}
@@ -61,8 +77,17 @@ def create_summarization_tab(model_name, model_description):
 
         final_summary = " ".join(summaries)
 
+        # Generate filename if no file was uploaded
+        if not base_name:
+            # Use the first 5 words of the summary
+            base_name = "_".join(re.findall(r'\w+', final_summary)[:5])
+            summary_filename = f"{base_name}_{model_description}"
+
+        # Ensure the filename is unique
+        unique_filename = create_unique_filename(summary_filename, "summary", ".txt")
+
         # Save the summary to a file
-        with open(f"summary/summary.txt", "w") as f:
+        with open(os.path.join("summary", unique_filename), "w") as f:
             f.write(final_summary)
 
         return {"text": final_summary}
